@@ -1,0 +1,59 @@
+# CLion remote docker environment (How to build docker container, run and stop it)
+#
+# Build and run:
+#   docker build -t clion/centos7-cpp-env:0.1 -f Dockerfile.centos7-cpp-env .
+#   docker run -d --cap-add sys_ptrace -p127.0.0.1:2222:22 clion/centos7-cpp-env:0.1
+#   ssh-keygen -f "$HOME/.ssh/known_hosts" -R "[localhost]:2222"
+#
+# stop:
+#   docker stop clion_remote_env
+#
+# ssh credentials (test user):
+#   user@password
+
+FROM centos:7
+
+
+RUN yum -y update \
+ && yum -y install openssh-server \
+  make \
+  autoconf \
+  automake \
+  locales-all \
+  dos2unix \
+  ninja-build \
+  build-essential \
+  gcc \
+  gcc-c++ \
+  texinfo \
+  clang \
+  cmake \
+  rsync \
+  tar \
+  python \
+ && yum clean all
+
+RUN curl -O https://ftp.gnu.org/gnu/gdb/gdb-8.3.1.tar.gz \
+ && tar -xzf gdb-8.3.1.tar.gz \
+ && cd gdb-8.3.1 && ./configure && make && make install \
+ && cd .. && rm -rf gdb-8.3.1 && rm -f gdb-8.3.1.tar.gz
+
+RUN ssh-keygen -A
+
+RUN ( \
+    echo 'LogLevel DEBUG2'; \
+    echo 'PermitRootLogin yes'; \
+    echo 'PasswordAuthentication yes'; \
+    echo 'Subsystem sftp /usr/libexec/openssh/sftp-server'; \
+  ) > /etc/ssh/sshd_config_test_clion
+
+RUN useradd -m user \
+  && yes password | passwd user
+
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod 755 /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+# CMD service mysql start && tail -F /var/log/mysql/error.log
